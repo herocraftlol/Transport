@@ -1,0 +1,20 @@
+name: CabinTransport
+version: '${project.version}'
+main: fr.cabintransport.CabinTransportPlugin
+api-version: '1.21'
+author: herocraftlol
+description: Cabine volante animée en temps réel — transporte les joueurs d'un point A à un point B le long d'une trajectoire en arc, avec décor de cabine, particules et sons.
+
+commands:
+  transport:
+    description: Gere les trajets de la cabine volante
+    aliases: [cabine, ctransport]
+    usage: /<command> <list|go|cancel|create|setstart|setend|setduration|setheight|setcabin|delete|reload|save>
+
+permissions:
+  transport.use:
+    description: Autorise a utiliser les trajets existants
+    default: true
+  transport.admin:
+    description: Autorise a creer/modifier/supprimer des trajets
+    default: op
