@@ -5,9 +5,9 @@ import fr.cabintransport.journey.Journey;
 import fr.cabintransport.model.CabinPart;
 import fr.cabintransport.model.Route;
 import fr.cabintransport.util.FlightMath;
+import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.Player;
 import org.bukkit.util.Transformation;
@@ -22,14 +22,21 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Gère le déplacement en temps réel des joueurs le long des trajets :
- * création de la cabine (siège + décor), animation trajectoire par trajectoire,
- * puis nettoyage en fin de voyage.
+ * Gère le déplacement en temps réel des joueurs le long des trajets.
+ *
+ * Le joueur est téléporté directement à chaque tick le long de la
+ * trajectoire (et non "monté" sur un véhicule) : c'est la méthode fiable
+ * pour que le client affiche un mouvement continu et suivi en temps réel -
+ * un ArmorStand-véhicule téléporté à chaque tick ne synchronise pas
+ * toujours correctement la position du passager côté client.
  */
 public class JourneyManager {
 
     private final CabinTransportPlugin plugin;
     private final Map<UUID, Journey> activeJourneys = new HashMap<>();
+    /** Mémorise si le joueur pouvait voler avant le trajet, pour restaurer son état ensuite. */
+    private final Map<UUID, Boolean> previousAllowFlight = new HashMap<>();
+    private final Map<UUID, Boolean> previousFlying = new HashMap<>();
 
     public JourneyManager(CabinTransportPlugin plugin) {
         this.plugin = plugin;
@@ -57,36 +64,35 @@ public class JourneyManager {
             return false;
         }
 
-        // Le siège : un ArmorStand invisible qui sert de véhicule au joueur
-        ArmorStand seat = start.getWorld().spawn(start, ArmorStand.class, stand -> {
-            stand.setVisible(false);
-            stand.setSmall(true);
-            stand.setGravity(false);
-            stand.setBasePlate(false);
-            stand.setArms(false);
-            stand.setInvulnerable(true);
-            stand.setSilent(true);
-            stand.setPersistent(false);
-            stand.setCollidable(false);
-            stand.setMarker(false);
-        });
+        Journey journey = new Journey(player, route);
 
-        Journey journey = new Journey(player, route, seat);
+        // Autorise le vol le temps du trajet pour éviter toute interférence
+        // avec la gravité / les vérifications de mouvement anti-triche.
+        previousAllowFlight.put(player.getUniqueId(), player.getAllowFlight());
+        previousFlying.put(player.getUniqueId(), player.isFlying());
+        player.setAllowFlight(true);
+        player.setFlying(true);
+        player.setFallDistance(0f);
+        player.setVelocity(new Vector(0, 0, 0));
+
+        player.leaveVehicle();
+
+        Location firstFrame = FlightMath.positionAt(start, end, route.getArcHeight(), 0.0);
+        if (!route.isLockCamera()) {
+            firstFrame.setYaw(player.getLocation().getYaw());
+            firstFrame.setPitch(player.getLocation().getPitch());
+        }
+        player.teleport(firstFrame);
 
         if (route.isCabinVisual()) {
-            spawnCabinDecor(journey, start, route.getCabinBlock());
+            spawnCabinDecor(journey, firstFrame, route.getCabinBlock());
         }
-
-        // Si le joueur est déjà dans un véhicule, on le fait descendre avant
-        player.leaveVehicle();
-        seat.addPassenger(player);
 
         activeJourneys.put(player.getUniqueId(), journey);
 
-        player.playSound(start, route.getSoundStart(), 1.0f, 1.0f);
+        player.playSound(firstFrame, route.getSoundStart(), 1.0f, 1.0f);
 
-        int period = 1; // animation à chaque tick pour un mouvement fluide
-        journey.setTask(plugin.getServer().getScheduler().runTaskTimer(plugin, () -> tick(journey), 0L, period));
+        journey.setTask(plugin.getServer().getScheduler().runTaskTimer(plugin, () -> tick(journey), 1L, 1L));
 
         return true;
     }
@@ -115,7 +121,7 @@ public class JourneyManager {
     /** Construit une petite plateforme avec 4 poteaux d'angle : la "cabine". */
     private List<CabinPart> buildCabinParts(Material floorMaterial) {
         List<CabinPart> parts = new ArrayList<>();
-        // plateforme
+        // plateforme sous les pieds du joueur
         parts.add(new CabinPart(0, -1.3, 0, 2.2f, 0.25f, 2.2f, floorMaterial));
         // poteaux d'angle
         Material post = Material.OAK_FENCE;
@@ -130,7 +136,7 @@ public class JourneyManager {
     private void tick(Journey journey) {
         Player player = plugin.getServer().getPlayer(journey.getPlayerUuid());
         if (player == null || !player.isOnline()) {
-            cleanup(journey, false);
+            cleanup(journey, true);
             return;
         }
 
@@ -143,9 +149,17 @@ public class JourneyManager {
         }
 
         Location current = FlightMath.positionAt(route.getStart(), route.getEnd(), route.getArcHeight(), t);
-        journey.getSeat().teleport(current);
+        if (!route.isLockCamera()) {
+            // conserve la direction de regard du joueur, on ne force que la position
+            current.setYaw(player.getLocation().getYaw());
+            current.setPitch(player.getLocation().getPitch());
+        }
 
-        // repositionne le décor de la cabine autour du siège
+        player.setFallDistance(0f);
+        player.setVelocity(new Vector(0, 0, 0));
+        player.teleport(current);
+
+        // repositionne le décor de la cabine autour du joueur
         List<CabinPart> parts = buildCabinParts(route.getCabinBlock());
         List<BlockDisplay> entities = journey.getCabinEntities();
         for (int i = 0; i < entities.size() && i < parts.size(); i++) {
@@ -167,9 +181,13 @@ public class JourneyManager {
     private void finish(Journey journey, Player player) {
         Route route = journey.getRoute();
         Location end = route.getEnd().clone();
+        if (!route.isLockCamera()) {
+            end.setYaw(player.getLocation().getYaw());
+            end.setPitch(player.getLocation().getPitch());
+        }
 
-        journey.setNaturalEnd(true);
-        player.leaveVehicle();
+        player.setFallDistance(0f);
+        player.setVelocity(new Vector(0, 0, 0));
         player.teleport(end);
         player.playSound(end, route.getSoundEnd(), 1.0f, 1.0f);
         end.getWorld().spawnParticle(route.getParticle(), end, 25, 0.6, 0.4, 0.6, 0.02);
@@ -177,12 +195,10 @@ public class JourneyManager {
         cleanup(journey, true);
     }
 
-    /** Annule un voyage en cours (commande /transport cancel, déconnexion, sortie manuelle...). */
+    /** Annule un voyage en cours (commande /transport cancel, déconnexion...). */
     public void cancel(Player player) {
         Journey journey = activeJourneys.get(player.getUniqueId());
         if (journey == null) return;
-        journey.setNaturalEnd(true);
-        player.leaveVehicle();
         cleanup(journey, true);
     }
 
@@ -190,40 +206,30 @@ public class JourneyManager {
         if (journey.getTask() != null) {
             journey.getTask().cancel();
         }
-        if (journey.getSeat() != null && !journey.getSeat().isDead()) {
-            journey.getSeat().remove();
-        }
         for (BlockDisplay display : journey.getCabinEntities()) {
             if (!display.isDead()) {
                 display.remove();
             }
+        }
+        Player player = plugin.getServer().getPlayer(journey.getPlayerUuid());
+        if (player != null) {
+            Boolean allowFlight = previousAllowFlight.remove(journey.getPlayerUuid());
+            Boolean flying = previousFlying.remove(journey.getPlayerUuid());
+            if (player.getGameMode() != GameMode.CREATIVE && player.getGameMode() != GameMode.SPECTATOR) {
+                player.setFlying(flying != null && flying);
+                player.setAllowFlight(allowFlight != null && allowFlight);
+            }
+        } else {
+            previousAllowFlight.remove(journey.getPlayerUuid());
+            previousFlying.remove(journey.getPlayerUuid());
         }
         if (removeFromMap) {
             activeJourneys.remove(journey.getPlayerUuid());
         }
     }
 
-    /** Utilisé par le listener pour savoir si une sortie de véhicule est volontaire (fin normale). */
-    public boolean isSeatEntity(int entityId) {
-        for (Journey j : activeJourneys.values()) {
-            if (j.getSeat().getEntityId() == entityId) return true;
-        }
-        return false;
-    }
-
-    public Journey getJourneyBySeat(int entityId) {
-        for (Journey j : activeJourneys.values()) {
-            if (j.getSeat().getEntityId() == entityId) return j;
-        }
-        return null;
-    }
-
     public void shutdown() {
         for (Journey journey : new ArrayList<>(activeJourneys.values())) {
-            Player player = plugin.getServer().getPlayer(journey.getPlayerUuid());
-            if (player != null) {
-                player.leaveVehicle();
-            }
             cleanup(journey, false);
         }
         activeJourneys.clear();

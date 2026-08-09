@@ -22,6 +22,8 @@ public class Route {
     private Sound soundEnd = Sound.ENTITY_PLAYER_LEVELUP;
     private boolean cabinVisual = true;
     private Material cabinBlock = Material.OAK_PLANKS;
+    /** Si true, la caméra du joueur est orientée dans le sens du déplacement (effet "vehicule"). */
+    private boolean lockCamera = true;
 
     public Route(String id) {
         this.id = id;
@@ -122,6 +124,14 @@ public class Route {
 
     public void setCabinBlock(Material cabinBlock) {
         this.cabinBlock = cabinBlock;
+    }
+
+    public boolean isLockCamera() {
+        return lockCamera;
+    }
+
+    public void setLockCamera(boolean lockCamera) {
+        this.lockCamera = lockCamera;
     }
 
     public boolean isComplete() {

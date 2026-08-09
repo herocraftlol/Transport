@@ -1,7 +1,6 @@
 package fr.cabintransport.journey;
 
 import fr.cabintransport.model.Route;
-import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
@@ -12,24 +11,21 @@ import java.util.UUID;
 
 /**
  * Représente un voyage en cours pour un joueur donné.
+ * Le joueur est déplacé directement (téléportation à chaque tick) le long
+ * de la trajectoire, entouré d'un décor de cabine optionnel.
  */
 public class Journey {
 
     private final UUID playerUuid;
     private final Route route;
-    private final ArmorStand seat;
     private final List<BlockDisplay> cabinEntities = new ArrayList<>();
 
     private BukkitTask task;
     private int currentTick = 0;
 
-    /** true si le voyage se termine normalement (évite une double annulation via VehicleExitEvent) */
-    private boolean naturalEnd = false;
-
-    public Journey(Player player, Route route, ArmorStand seat) {
+    public Journey(Player player, Route route) {
         this.playerUuid = player.getUniqueId();
         this.route = route;
-        this.seat = seat;
     }
 
     public UUID getPlayerUuid() {
@@ -38,10 +34,6 @@ public class Journey {
 
     public Route getRoute() {
         return route;
-    }
-
-    public ArmorStand getSeat() {
-        return seat;
     }
 
     public List<BlockDisplay> getCabinEntities() {
@@ -62,14 +54,6 @@ public class Journey {
 
     public void incrementTick() {
         this.currentTick++;
-    }
-
-    public boolean isNaturalEnd() {
-        return naturalEnd;
-    }
-
-    public void setNaturalEnd(boolean naturalEnd) {
-        this.naturalEnd = naturalEnd;
     }
 
     public double progress() {

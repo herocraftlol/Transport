@@ -17,7 +17,7 @@ public class TransportCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBCOMMANDS = List.of(
             "list", "go", "cancel", "create", "setstart", "setend",
-            "setduration", "setheight", "setcabin", "delete", "reload", "save"
+            "setduration", "setheight", "setcabin", "setcamera", "delete", "reload", "save"
     );
 
     private final CabinTransportPlugin plugin;
@@ -44,6 +44,7 @@ public class TransportCommand implements CommandExecutor, TabCompleter {
             case "setduration" -> handleSetDuration(sender, args);
             case "setheight" -> handleSetHeight(sender, args);
             case "setcabin" -> handleSetCabin(sender, args);
+            case "setcamera" -> handleSetCamera(sender, args);
             case "delete" -> handleDelete(sender, args);
             case "reload" -> handleReload(sender);
             case "save" -> handleSave(sender);
@@ -57,7 +58,7 @@ public class TransportCommand implements CommandExecutor, TabCompleter {
                 "&b&lCabinTransport &8- &7/transport list|go <trajet>|cancel"));
         if (sender.hasPermission("transport.admin")) {
             sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                    "&7Admin: &8/transport create|setstart|setend|setduration|setheight|setcabin|delete|reload|save <trajet>"));
+                    "&7Admin: &8/transport create|setstart|setend|setduration|setheight|setcabin|setcamera|delete|reload|save <trajet>"));
         }
     }
 
@@ -214,6 +215,21 @@ public class TransportCommand implements CommandExecutor, TabCompleter {
         plugin.getMessages().send(sender, "route-updated", "%route%", route.getId());
     }
 
+    private void handleSetCamera(CommandSender sender, String[] args) {
+        if (!checkAdmin(sender)) return;
+        if (args.length < 3) {
+            sendHelp(sender);
+            return;
+        }
+        Route route = plugin.getRouteManager().get(args[1]);
+        if (route == null) {
+            plugin.getMessages().send(sender, "unknown-route", "%route%", args[1]);
+            return;
+        }
+        route.setLockCamera(Boolean.parseBoolean(args[2]));
+        plugin.getMessages().send(sender, "route-updated", "%route%", route.getId());
+    }
+
     private void handleDelete(CommandSender sender, String[] args) {
         if (!checkAdmin(sender)) return;
         if (args.length < 2) {
@@ -261,7 +277,7 @@ public class TransportCommand implements CommandExecutor, TabCompleter {
                     .map(Route::getId)
                     .filter(id -> id.startsWith(prefix))
                     .collect(Collectors.toList()));
-        } else if (args.length == 3 && args[0].equalsIgnoreCase("setcabin")) {
+        } else if (args.length == 3 && (args[0].equalsIgnoreCase("setcabin") || args[0].equalsIgnoreCase("setcamera"))) {
             out.addAll(List.of("true", "false"));
         }
         return out;

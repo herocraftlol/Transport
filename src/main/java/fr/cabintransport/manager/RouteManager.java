@@ -72,6 +72,7 @@ public class RouteManager {
             }
 
             route.setCabinVisual(r.getBoolean("cabin-visual", true));
+            route.setLockCamera(r.getBoolean("lock-camera", true));
             try {
                 route.setCabinBlock(Material.valueOf(r.getString("cabin-block", "OAK_PLANKS").toUpperCase()));
             } catch (IllegalArgumentException ignored) {
@@ -122,6 +123,7 @@ public class RouteManager {
             r.set("sound-loop", route.getSoundLoop().name());
             r.set("sound-end", route.getSoundEnd().name());
             r.set("cabin-visual", route.isCabinVisual());
+            r.set("lock-camera", route.isLockCamera());
             r.set("cabin-block", route.getCabinBlock().name());
         }
         plugin.saveConfig();

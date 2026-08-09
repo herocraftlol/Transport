@@ -9,7 +9,7 @@ commands:
   transport:
     description: Gere les trajets de la cabine volante
     aliases: [cabine, ctransport]
-    usage: /<command> <list|go|cancel|create|setstart|setend|setduration|setheight|setcabin|delete|reload|save>
+    usage: /<command> <list|go|cancel|create|setstart|setend|setduration|setheight|setcabin|setcamera|delete|reload|save>
 
 permissions:
   transport.use:

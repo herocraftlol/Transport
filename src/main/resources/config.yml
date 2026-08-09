@@ -39,6 +39,9 @@ routes:
     sound-end: ENTITY_PLAYER_LEVELUP
     cabin-visual: true
     cabin-block: OAK_PLANKS
+    # true : la caméra du joueur suit la direction du trajet (effet "vehicule")
+    # false : le joueur garde le contrôle de sa caméra pendant le trajet
+    lock-camera: true
 
 messages:
   prefix: "&b&lTransport &8» &r"
