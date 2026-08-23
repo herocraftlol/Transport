@@ -60,5 +60,6 @@ messages:
   config-reloaded: "&aConfiguration rechargee."
   config-saved: "&aConfiguration sauvegardee."
   different-world-error: "&cLe depart et l'arrivee doivent etre dans le meme monde."
+  world-not-loaded: "&cLe monde de ce trajet n'est pas charge actuellement."
   route-incomplete: "&cCe trajet n'a pas de point de depart et/ou d'arrivee defini."
   player-only: "&cCette commande doit etre executee par un joueur."

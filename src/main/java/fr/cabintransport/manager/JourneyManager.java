@@ -57,9 +57,9 @@ public class JourneyManager {
         if (!route.isComplete()) {
             return false;
         }
-        Location start = route.getStart();
-        Location end = route.getEnd();
-        if (start.getWorld() == null || end.getWorld() == null
+        Location start = route.getStartLocation();
+        Location end = route.getEndLocation();
+        if (start == null || end == null
                 || !start.getWorld().equals(end.getWorld())) {
             return false;
         }
@@ -148,7 +148,15 @@ public class JourneyManager {
             return;
         }
 
-        Location current = FlightMath.positionAt(route.getStart(), route.getEnd(), route.getArcHeight(), t);
+        Location startLoc = route.getStartLocation();
+        Location endLoc = route.getEndLocation();
+        if (startLoc == null || endLoc == null) {
+            // le monde a été déchargé en cours de route : on annule proprement
+            cleanup(journey, true);
+            return;
+        }
+
+        Location current = FlightMath.positionAt(startLoc, endLoc, route.getArcHeight(), t);
         if (!route.isLockCamera()) {
             // conserve la direction de regard du joueur, on ne force que la position
             current.setYaw(player.getLocation().getYaw());
@@ -180,7 +188,11 @@ public class JourneyManager {
 
     private void finish(Journey journey, Player player) {
         Route route = journey.getRoute();
-        Location end = route.getEnd().clone();
+        Location end = route.getEndLocation();
+        if (end == null) {
+            cleanup(journey, true);
+            return;
+        }
         if (!route.isLockCamera()) {
             end.setYaw(player.getLocation().getYaw());
             end.setPitch(player.getLocation().getPitch());

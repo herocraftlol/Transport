@@ -53,8 +53,14 @@ Chaque trajet (route) définit :
   trajet.
 - 🧹 Nettoyage propre à l'arrivée, en cas d'annulation manuelle
   (`/transport cancel`) ou de déconnexion.
-- 🗺️ Trajets entièrement **créables et éditables en jeu**, puis sauvegardés
-  dans `config.yml`.
+- 🗺️ Trajets entièrement **créables et éditables en jeu**, avec
+  **sauvegarde automatique** dans `config.yml` après chaque modification.
+- 💾 **Sauvegarde à l'arrêt** : les trajets sont écrits dans `config.yml`
+  quand le serveur s'éteint — rien ne se perd, même après un crash.
+- 🌍 **Mondes chargés à la demande** : un trajet dont le monde n'est pas
+  encore chargé (Multiverse, ordre de démarrage…) reste visible et redevient
+  utilisable dès que son monde se charge — plus aucun trajet perdu au
+  redémarrage.
 - 🔄 Rechargement à chaud de la configuration sans redémarrer le serveur.
 
 ## 📦 Installation
@@ -129,8 +135,13 @@ Alias de commande : `/cabine`, `/ctransport`.
 /transport setduration paris 8
 /transport setheight paris 30
 /transport setcamera paris true   # la caméra suit le sens du trajet (optionnel)
-/transport save
 ```
+
+Chaque commande admin (`create`, `setstart`, `setend`, `setduration`,
+`setheight`, `setcabin`, `setcamera`, `delete`) **sauvegarde automatiquement**
+`config.yml` : plus besoin de penser à `/transport save`, vos trajets survivent
+à un redémarrage du serveur. `/transport save` reste disponible pour une
+sauvegarde manuelle explicite si besoin.
 
 Puis n'importe quel joueur peut faire `/transport go paris`. 🎉
 
@@ -154,6 +165,13 @@ Puis n'importe quel joueur peut faire `/transport go paris`. 🎉
   du trajet, comme dans un vrai véhicule ; mettez `false` pour qu'il garde le
   contrôle de sa vue pendant le trajet.
 - Des particules et des sons accompagnent chaque phase du trajet.
+- Les points de départ/arrivée sont stockés en **référence brute** (nom du
+  monde + coordonnées, classe `PointRef`) et ne sont résolus vers un monde
+  Bukkit qu'**au moment d'utiliser le trajet** — jamais au chargement du
+  plugin. Ainsi, un trajet dont le monde se charge après le plugin (ordre de
+  démarrage, Multiverse…) n'est plus jamais perdu : il s'affiche dans
+  `/transport list` avec le statut `(monde non charge)` et redevient
+  utilisable dès que son monde est là, sans `/transport reload`.
 - Le joueur reçoit temporairement `allowFlight`/`flying` (pour éviter toute
   interférence avec la gravité pendant le trajet, état restauré à l'arrivée)
   et est rendu **invulnérable** (pas de dégâts de chute, de vide, etc.). Tout
@@ -167,22 +185,44 @@ Puis n'importe quel joueur peut faire `/transport go paris`. 🎉
 
 ## 📜 Version
 
-Version actuelle : **1.2.0** — voir les [releases](../../releases) pour le
+Version actuelle : **1.3.0** — voir les [releases](../../releases) pour le
 journal des modifications et les téléchargements.
 
-### 🆕 Nouveautés de la v1.2.0
+### 🆕 Nouveautés de la v1.3.0
 
-- 🚀 **Refonte du déplacement** : le joueur est désormais **téléporté
-  directement** à chaque tick le long de la parabole, en remplacement du
-  siège `ArmorStand`. Le mouvement est enfin fluide, continu et correctement
-  synchronisé côté client (plus de « freeze puis téléportation à l'arrivée »).
-- 📷 **Verrouillage de caméra** : nouvelle option `lock-camera` et commande
+- 🌍 **Correction des trajets qui disparaissaient au redémarrage** : le monde
+  d'un trajet n'est plus résolu au chargement du plugin, mais **au moment
+  d'utiliser le trajet**. Si le monde se charge après le plugin (ordre de
+  démarrage des plugins, monde créé par Multiverse…), le trajet n'est plus
+  perdu : il reste listé avec le statut `(monde non charge)` et redevient
+  utilisable tout seul dès que son monde se charge, sans `/transport reload`.
+- 💾 **Sauvegarde automatique** : chaque commande admin (`create`, `setstart`,
+  `setend`, `setduration`, `setheight`, `setcabin`, `setcamera`, `delete`)
+  écrit immédiatement `config.yml`. Vos trajets survivent aux redémarrages
+  sans avoir à penser à `/transport save`.
+- 🛑 **Sauvegarde à l'arrêt du serveur** : les trajets sont également écrits
+  dans `config.yml` quand le plugin se désactive (`onDisable`), pour ne rien
+  perdre même en cas d'arrêt inattendu.
+- ✉️ **Nouveau message** `world-not-loaded` : si un joueur tente d'emprunter
+  un trajet dont le monde n'est pas encore chargé, il reçoit un message clair
+  au lieu d'une erreur générique.
+- 🧭 **Voyage interrompu proprement** : si le monde d'un trajet est déchargé
+  en plein vol, le voyage est annulé proprement (nettoyage complet du joueur
+  et du décor) au lieu de rester bloqué.
+
+### 🕰️ Rappel des nouveautés de la v1.2.0
+
+- 🚀 **Refonte du déplacement** : le joueur est **téléporté directement** à
+  chaque tick le long de la parabole, en remplacement du siège `ArmorStand`.
+  Le mouvement est fluide, continu et correctement synchronisé côté client
+  (plus de « freeze puis téléportation à l'arrivée »).
+- 📷 **Verrouillage de caméra** : option `lock-camera` et commande
   `/transport setcamera <id> <true/false>`. En `true`, la caméra suit le sens
   du trajet (effet véhicule) ; en `false`, le joueur garde le contrôle de sa
   vue pendant le vol.
-- 🪽 **Gestion de l'état de vol** : l'état `allowFlight`/`flying` du joueur est
-  sauvegardé avant le trajet puis restauré à l'arrivée, sans interférer avec la
-  gravité ni les anti-triches.
+- 🪽 **Gestion de l'état de vol** : l'état `allowFlight`/`flying` du joueur
+  est sauvegardé avant le trajet puis restauré à l'arrivée, sans interférer
+  avec la gravité ni les anti-triches.
 - 🛡️ **Invulnérabilité** pendant toute la durée du trajet (chute, vide,
   suffocation dans le décor), annulée proprement à la fin.
 - 🧹 Nettoyage simplifié et plus robuste à l'arrivée, à l'annulation et à la

@@ -36,6 +36,9 @@ public class CabinTransportPlugin extends JavaPlugin {
         if (journeyManager != null) {
             journeyManager.shutdown();
         }
+        if (routeManager != null) {
+            routeManager.save();
+        }
     }
 
     public RouteManager getRouteManager() {

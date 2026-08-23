@@ -7,13 +7,16 @@ import org.bukkit.Sound;
 
 /**
  * Représente un trajet configurable entre un point A et un point B.
+ * Les points sont stockés en référence brute (PointRef) et résolus vers
+ * un monde Bukkit uniquement à l'usage, pour ne jamais perdre un trajet
+ * si son monde n'est pas encore chargé au démarrage du plugin.
  */
 public class Route {
 
     private final String id;
     private String displayName;
-    private Location start;
-    private Location end;
+    private PointRef start;
+    private PointRef end;
     private int durationTicks = 200; // 10s par défaut
     private double arcHeight = 20.0;
     private Particle particle = Particle.CLOUD;
@@ -42,20 +45,38 @@ public class Route {
         this.displayName = displayName;
     }
 
-    public Location getStart() {
+    public PointRef getStart() {
         return start;
     }
 
-    public void setStart(Location start) {
+    public void setStart(PointRef start) {
         this.start = start;
     }
 
-    public Location getEnd() {
+    public void setStart(Location location) {
+        this.start = PointRef.of(location);
+    }
+
+    public PointRef getEnd() {
         return end;
     }
 
-    public void setEnd(Location end) {
+    public void setEnd(PointRef end) {
         this.end = end;
+    }
+
+    public void setEnd(Location location) {
+        this.end = PointRef.of(location);
+    }
+
+    /** Résout le point de départ vers une Location, ou null si le monde n'est pas chargé. */
+    public Location getStartLocation() {
+        return start == null ? null : start.resolve();
+    }
+
+    /** Résout le point d'arrivée vers une Location, ou null si le monde n'est pas chargé. */
+    public Location getEndLocation() {
+        return end == null ? null : end.resolve();
     }
 
     public int getDurationTicks() {
@@ -134,7 +155,13 @@ public class Route {
         this.lockCamera = lockCamera;
     }
 
+    /** true si le trajet a bien un départ et une arrivée définis (même si le monde n'est pas chargé). */
     public boolean isComplete() {
         return start != null && end != null;
+    }
+
+    /** true si le trajet est complet ET que son monde est actuellement chargé. */
+    public boolean isReady() {
+        return isComplete() && getStartLocation() != null && getEndLocation() != null;
     }
 }

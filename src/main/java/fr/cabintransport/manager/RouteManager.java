@@ -1,13 +1,11 @@
 package fr.cabintransport.manager;
 
 import fr.cabintransport.CabinTransportPlugin;
+import fr.cabintransport.model.PointRef;
 import fr.cabintransport.model.Route;
-import org.bukkit.Bukkit;
-import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
-import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 
@@ -17,6 +15,11 @@ import java.util.Map;
 
 /**
  * Charge, sauvegarde et gère l'ensemble des trajets définis dans config.yml.
+ *
+ * Important : le chargement ne dépend d'AUCUN monde Bukkit déjà chargé.
+ * Les coordonnées sont lues telles quelles (PointRef) et ne sont résolues
+ * vers un monde réel qu'au moment de l'utilisation (voir Route#getStartLocation).
+ * Cela évite de perdre des trajets si leur monde se charge après le plugin.
  */
 public class RouteManager {
 
@@ -41,13 +44,12 @@ public class RouteManager {
             route.setDisplayName(r.getString("display-name", id));
 
             String worldName = r.getString("world", "world");
-            World world = Bukkit.getWorld(worldName);
 
-            if (r.isConfigurationSection("start") && world != null) {
-                route.setStart(readLocation(r.getConfigurationSection("start"), world));
+            if (r.isConfigurationSection("start")) {
+                route.setStart(readPoint(r.getConfigurationSection("start"), worldName));
             }
-            if (r.isConfigurationSection("end") && world != null) {
-                route.setEnd(readLocation(r.getConfigurationSection("end"), world));
+            if (r.isConfigurationSection("end")) {
+                route.setEnd(readPoint(r.getConfigurationSection("end"), worldName));
             }
 
             route.setDurationSeconds(r.getDouble("duration-seconds", 10.0));
@@ -79,25 +81,30 @@ public class RouteManager {
             }
 
             routes.put(id.toLowerCase(), route);
+
+            if (!route.isReady()) {
+                plugin.getLogger().warning("Le trajet '" + id + "' reference un monde non charge ('"
+                        + worldName + "') : il restera indisponible tant que ce monde ne sera pas charge.");
+            }
         }
     }
 
-    private Location readLocation(ConfigurationSection s, World world) {
+    private PointRef readPoint(ConfigurationSection s, String worldName) {
         double x = s.getDouble("x");
         double y = s.getDouble("y");
         double z = s.getDouble("z");
         float yaw = (float) s.getDouble("yaw", 0.0);
         float pitch = (float) s.getDouble("pitch", 0.0);
-        return new Location(world, x, y, z, yaw, pitch);
+        return new PointRef(worldName, x, y, z, yaw, pitch);
     }
 
-    private void writeLocation(ConfigurationSection parent, String key, Location loc) {
+    private void writePoint(ConfigurationSection parent, String key, PointRef point) {
         ConfigurationSection s = parent.createSection(key);
-        s.set("x", loc.getX());
-        s.set("y", loc.getY());
-        s.set("z", loc.getZ());
-        s.set("yaw", (double) loc.getYaw());
-        s.set("pitch", (double) loc.getPitch());
+        s.set("x", point.getX());
+        s.set("y", point.getY());
+        s.set("z", point.getZ());
+        s.set("yaw", (double) point.getYaw());
+        s.set("pitch", (double) point.getPitch());
     }
 
     public void save() {
@@ -107,15 +114,17 @@ public class RouteManager {
         for (Route route : routes.values()) {
             ConfigurationSection r = section.createSection(route.getId());
             r.set("display-name", route.getDisplayName());
+
             String worldName = "world";
-            if (route.getStart() != null && route.getStart().getWorld() != null) {
-                worldName = route.getStart().getWorld().getName();
-            } else if (route.getEnd() != null && route.getEnd().getWorld() != null) {
-                worldName = route.getEnd().getWorld().getName();
+            if (route.getStart() != null) {
+                worldName = route.getStart().getWorldName();
+            } else if (route.getEnd() != null) {
+                worldName = route.getEnd().getWorldName();
             }
             r.set("world", worldName);
-            if (route.getStart() != null) writeLocation(r, "start", route.getStart());
-            if (route.getEnd() != null) writeLocation(r, "end", route.getEnd());
+
+            if (route.getStart() != null) writePoint(r, "start", route.getStart());
+            if (route.getEnd() != null) writePoint(r, "end", route.getEnd());
             r.set("duration-seconds", route.getDurationSeconds());
             r.set("arc-height", route.getArcHeight());
             r.set("particle", route.getParticle().name());

@@ -65,7 +65,14 @@ public class TransportCommand implements CommandExecutor, TabCompleter {
     private void handleList(CommandSender sender) {
         plugin.getMessages().send(sender, "route-list-header");
         for (Route route : plugin.getRouteManager().getRoutes()) {
-            String status = route.isComplete() ? "" : ChatColor.RED + " (incomplet)";
+            String status;
+            if (!route.isComplete()) {
+                status = ChatColor.RED + " (incomplet)";
+            } else if (!route.isReady()) {
+                status = ChatColor.YELLOW + " (monde non charge)";
+            } else {
+                status = "";
+            }
             sender.sendMessage(ChatColor.GRAY + " - " + ChatColor.AQUA + route.getId()
                     + ChatColor.GRAY + " : " + route.getDisplayName() + status);
         }
@@ -100,6 +107,8 @@ public class TransportCommand implements CommandExecutor, TabCompleter {
         boolean started = plugin.getJourneyManager().start(player, route);
         if (started) {
             plugin.getMessages().send(sender, "journey-start", "%route%", route.getDisplayName());
+        } else if (!route.isReady()) {
+            plugin.getMessages().send(sender, "world-not-loaded");
         } else {
             plugin.getMessages().send(sender, "different-world-error");
         }
@@ -135,6 +144,7 @@ public class TransportCommand implements CommandExecutor, TabCompleter {
             route.setDisplayName(display);
         }
         plugin.getMessages().send(sender, "route-created", "%route%", id);
+        plugin.getRouteManager().save();
     }
 
     private void handleSetPoint(CommandSender sender, String[] args, boolean isStart) {
@@ -158,6 +168,7 @@ public class TransportCommand implements CommandExecutor, TabCompleter {
             route.setEnd(player.getLocation().clone());
         }
         plugin.getMessages().send(sender, "point-set", "%point%", isStart ? "depart" : "arrivee");
+        plugin.getRouteManager().save();
     }
 
     private void handleSetDuration(CommandSender sender, String[] args) {
@@ -175,6 +186,7 @@ public class TransportCommand implements CommandExecutor, TabCompleter {
             double seconds = Double.parseDouble(args[2]);
             route.setDurationSeconds(seconds);
             plugin.getMessages().send(sender, "route-updated", "%route%", route.getId());
+            plugin.getRouteManager().save();
         } catch (NumberFormatException e) {
             sender.sendMessage(ChatColor.RED + "Nombre invalide.");
         }
@@ -195,6 +207,7 @@ public class TransportCommand implements CommandExecutor, TabCompleter {
             double height = Double.parseDouble(args[2]);
             route.setArcHeight(height);
             plugin.getMessages().send(sender, "route-updated", "%route%", route.getId());
+            plugin.getRouteManager().save();
         } catch (NumberFormatException e) {
             sender.sendMessage(ChatColor.RED + "Nombre invalide.");
         }
@@ -213,6 +226,7 @@ public class TransportCommand implements CommandExecutor, TabCompleter {
         }
         route.setCabinVisual(Boolean.parseBoolean(args[2]));
         plugin.getMessages().send(sender, "route-updated", "%route%", route.getId());
+        plugin.getRouteManager().save();
     }
 
     private void handleSetCamera(CommandSender sender, String[] args) {
@@ -228,6 +242,7 @@ public class TransportCommand implements CommandExecutor, TabCompleter {
         }
         route.setLockCamera(Boolean.parseBoolean(args[2]));
         plugin.getMessages().send(sender, "route-updated", "%route%", route.getId());
+        plugin.getRouteManager().save();
     }
 
     private void handleDelete(CommandSender sender, String[] args) {
@@ -242,6 +257,7 @@ public class TransportCommand implements CommandExecutor, TabCompleter {
         }
         plugin.getRouteManager().deleteRoute(args[1]);
         plugin.getMessages().send(sender, "route-deleted", "%route%", args[1]);
+        plugin.getRouteManager().save();
     }
 
     private void handleReload(CommandSender sender) {
